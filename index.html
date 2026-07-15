@@ -6,7 +6,7 @@
     name="viewport"
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
   >
-  <title>アクラブ受付AR</title>
+  <title>アクラブAR</title>
 
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
@@ -91,7 +91,7 @@
 </head>
 
 <body>
-  <div id="guide">受付のマークにカメラを向けてください</div>
+  <div id="guide">マークにカメラを向けてください</div>
   <button id="capture-button" type="button" aria-label="写真を撮る"></button>
   <div id="flash"></div>
   <div id="message"></div>
@@ -144,7 +144,7 @@
     const message = document.querySelector("#message");
 
     scene.addEventListener("arReady", () => {
-      guide.textContent = "受付のマークを探してください";
+      guide.textContent = "マークを探してください";
       setTimeout(() => window.dispatchEvent(new Event("resize")), 300);
       setTimeout(() => window.dispatchEvent(new Event("resize")), 1000);
     });
@@ -160,7 +160,7 @@
 
     target.addEventListener("targetLost", () => {
       guide.style.display = "block";
-      guide.textContent = "もう一度、受付のマークを映してください";
+      guide.textContent = "もう一度、マークを映してください";
     });
 
     window.addEventListener("orientationchange", () => {
