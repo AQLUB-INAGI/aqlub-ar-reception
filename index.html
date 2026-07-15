@@ -105,6 +105,7 @@
       filterBeta: 0.01;
       warmupTolerance: 5;
       missTolerance: 10;
+      maxTrack: 1;
     "
     color-space="sRGB"
     renderer="
@@ -119,11 +120,18 @@
   >
     <a-assets>
       <img id="welcome-character" src="./images/welcome.png">
+      <img id="shark-character" src="./images/shark.png">
+      <img id="gokiburi-character" src="./images/gokiburi.png">
     </a-assets>
 
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <a-entity id="reception-target" mindar-image-target="targetIndex: 0">
+    <!-- targetIndex 0：受付 -->
+    <a-entity
+      id="reception-target"
+      class="ar-target"
+      mindar-image-target="targetIndex: 0"
+    >
       <a-image
         id="welcome-image"
         src="#welcome-character"
@@ -133,11 +141,45 @@
         material="shader: flat; transparent: true; alphaTest: 0.05; side: double"
       ></a-image>
     </a-entity>
+
+    <!-- targetIndex 1：シャーク -->
+    <!-- マーカーの下に表示し、床に足が付くようにした初期値 -->
+    <a-entity
+      id="shark-target"
+      class="ar-target"
+      mindar-image-target="targetIndex: 1"
+    >
+      <a-image
+        id="shark-image"
+        src="#shark-character"
+        position="0 -1.95 0.02"
+        width="2.30"
+        height="2.30"
+        material="shader: flat; transparent: true; alphaTest: 0.05; side: double"
+      ></a-image>
+    </a-entity>
+
+    <!-- targetIndex 2：ゴキブリ -->
+    <!-- マーカーの上に表示し、飛んでいるようにした初期値 -->
+    <a-entity
+      id="gokiburi-target"
+      class="ar-target"
+      mindar-image-target="targetIndex: 2"
+    >
+      <a-image
+        id="gokiburi-image"
+        src="#gokiburi-character"
+        position="0 1.65 0.02"
+        width="2.35"
+        height="2.35"
+        material="shader: flat; transparent: true; alphaTest: 0.05; side: double"
+      ></a-image>
+    </a-entity>
   </a-scene>
 
   <script>
     const scene = document.querySelector("#ar-scene");
-    const target = document.querySelector("#reception-target");
+    const targets = document.querySelectorAll(".ar-target");
     const guide = document.querySelector("#guide");
     const captureButton = document.querySelector("#capture-button");
     const flash = document.querySelector("#flash");
@@ -154,13 +196,15 @@
         "カメラを開始できません。ブラウザのカメラ許可を確認してください";
     });
 
-    target.addEventListener("targetFound", () => {
-      guide.style.display = "none";
-    });
+    targets.forEach((target) => {
+      target.addEventListener("targetFound", () => {
+        guide.style.display = "none";
+      });
 
-    target.addEventListener("targetLost", () => {
-      guide.style.display = "block";
-      guide.textContent = "もう一度、マークを映してください";
+      target.addEventListener("targetLost", () => {
+        guide.style.display = "block";
+        guide.textContent = "もう一度、マークを映してください";
+      });
     });
 
     window.addEventListener("orientationchange", () => {
