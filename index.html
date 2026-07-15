@@ -2,121 +2,132 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0,
-    maximum-scale=1.0, user-scalable=no"
-  >
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>アクラブ受付AR</title>
 
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    html,
-    body {
+    html, body {
       width: 100%;
       height: 100%;
       margin: 0;
       overflow: hidden;
+      background: #000;
+      font-family: sans-serif;
     }
 
     #guide {
       position: fixed;
       left: 50%;
-      bottom: 24px;
+      bottom: 22px;
       transform: translateX(-50%);
       z-index: 1000;
-      padding: 10px 16px;
-      border-radius: 20px;
-      background: rgba(0, 0, 0, 0.65);
-      color: white;
-      font-family: sans-serif;
+      max-width: 86vw;
+      padding: 11px 18px;
+      border-radius: 24px;
+      background: rgba(0, 0, 0, 0.68);
+      color: #fff;
       font-size: 16px;
       text-align: center;
-      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    #start-cover {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.78);
+    }
+
+    #start-button {
+      border: 0;
+      border-radius: 30px;
+      padding: 16px 28px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #fff;
+      background: #0877d1;
+      cursor: pointer;
     }
   </style>
 </head>
 
 <body>
-
-  <div id="guide">
-    壁のマークにカメラを向けてください
+  <div id="start-cover">
+    <button id="start-button" type="button">カメラを起動する</button>
   </div>
 
+  <div id="guide">受付のマークにカメラを向けてください</div>
+
   <a-scene
+    id="ar-scene"
     mindar-image="
       imageTargetSrc: ./targets.mind;
-      autoStart: true;
+      autoStart: false;
       filterMinCF: 0.001;
       filterBeta: 0.01;
       warmupTolerance: 5;
-      missTolerance: 10;
+      missTolerance: 12;
     "
     embedded
     color-space="sRGB"
-    renderer="
-      colorManagement: true;
-      physicallyCorrectLights: true;
-      antialias: true;
-      alpha: true;
-    "
+    renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true; alpha: true;"
     vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false"
   >
-
     <a-assets>
-      <img
-        id="welcome-character"
-        src="./images/welcome.png"
-        alt=""
-      >
+      <img id="welcome-character" src="./images/welcome.png" alt="" crossorigin="anonymous">
     </a-assets>
 
-    <a-camera
-      position="0 0 0"
-      look-controls="enabled: false"
-    ></a-camera>
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <a-entity
-      id="reception-target"
-      mindar-image-target="targetIndex: 0"
-    >
-
+    <a-entity id="reception-target" mindar-image-target="targetIndex: 0">
+      <!--
+        新しい設置位置向けの初期値です。
+        マーカーの左側、受付台の上にキャラクターを表示します。
+      -->
       <a-image
+        id="welcome-image"
         src="#welcome-character"
-        position="-1.05 -0.75 0"
-        width="1.1"
-        height="1.1"
+        position="-1.35 0.10 0.02"
+        width="1.35"
+        height="1.35"
         transparent="true"
-        material="
-          shader: flat;
-          transparent: true;
-          alphaTest: 0.05;
-          side: double;
-        "
+        material="shader: flat; transparent: true; alphaTest: 0.05; side: double;"
       ></a-image>
-
     </a-entity>
-
   </a-scene>
 
   <script>
-    const scene = document.querySelector("a-scene");
+    const scene = document.querySelector("#ar-scene");
     const target = document.querySelector("#reception-target");
     const guide = document.querySelector("#guide");
+    const startCover = document.querySelector("#start-cover");
+    const startButton = document.querySelector("#start-button");
+
+    startButton.addEventListener("click", async () => {
+      try {
+        const arSystem = scene.systems["mindar-image-system"];
+        await arSystem.start();
+        startCover.style.display = "none";
+        guide.textContent = "受付のマークにカメラを向けてください";
+      } catch (error) {
+        console.error(error);
+        guide.textContent = "カメラを開始できません。ブラウザのカメラ許可を確認してください";
+      }
+    });
 
     scene.addEventListener("arReady", () => {
       guide.textContent = "受付のマークを探してください";
     });
 
     scene.addEventListener("arError", () => {
-      guide.textContent =
-        "カメラを開始できません。ブラウザのカメラ許可を確認してください";
+      guide.textContent = "カメラを開始できません。ブラウザのカメラ許可を確認してください";
     });
 
     target.addEventListener("targetFound", () => {
@@ -125,9 +136,8 @@
 
     target.addEventListener("targetLost", () => {
       guide.style.display = "block";
-      guide.textContent = "もう一度マークにカメラを向けてください";
+      guide.textContent = "もう一度、受付のマークを映してください";
     });
   </script>
-
 </body>
 </html>
