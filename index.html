@@ -107,7 +107,13 @@
       missTolerance: 10;
     "
     color-space="sRGB"
-    renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true"
+    renderer="
+      colorManagement: true;
+      physicallyCorrectLights: true;
+      alpha: true;
+      antialias: true;
+      preserveDrawingBuffer: true;
+    "
     vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false"
   >
@@ -121,9 +127,9 @@
       <a-image
         id="welcome-image"
         src="#welcome-character"
-        position="-1.55 0.55 0.02"
-        width="2.20"
-        height="2.20"
+        position="-1.60 0.25 0.02"
+        width="2.55"
+        height="2.55"
         material="shader: flat; transparent: true; alphaTest: 0.05; side: double"
       ></a-image>
     </a-entity>
@@ -169,32 +175,35 @@
       }, 2400);
     }
 
-    function drawVideoCover(ctx, video, width, height) {
-      if (!video.videoWidth || !video.videoHeight) {
-        throw new Error("camera-not-ready");
-      }
-
-      const scale = Math.max(
-        width / video.videoWidth,
-        height / video.videoHeight
-      );
-
-      const drawWidth = video.videoWidth * scale;
-      const drawHeight = video.videoHeight * scale;
-      const offsetX = (width - drawWidth) / 2;
-      const offsetY = (height - drawHeight) / 2;
-
-      ctx.drawImage(video, offsetX, offsetY, drawWidth, drawHeight);
+    function drawCover(ctx, source, sourceWidth, sourceHeight, destWidth, destHeight) {
+      const scale = Math.max(destWidth / sourceWidth, destHeight / sourceHeight);
+      const width = sourceWidth * scale;
+      const height = sourceHeight * scale;
+      const x = (destWidth - width) / 2;
+      const y = (destHeight - height) / 2;
+      ctx.drawImage(source, x, y, width, height);
     }
 
     async function capturePhoto() {
       try {
         const video = document.querySelector("video");
-        const arCanvas = scene.canvas;
+        const rendererCanvas =
+          scene.renderer && scene.renderer.domElement
+            ? scene.renderer.domElement
+            : scene.canvas;
 
-        if (!video || !arCanvas) {
+        if (
+          !video ||
+          !rendererCanvas ||
+          !video.videoWidth ||
+          !video.videoHeight
+        ) {
           showMessage("カメラの準備ができていません");
           return;
+        }
+
+        if (scene.renderer && scene.object3D && scene.camera) {
+          scene.renderer.render(scene.object3D, scene.camera);
         }
 
         flash.style.transition = "none";
@@ -204,16 +213,34 @@
           flash.style.opacity = "0";
         });
 
-        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
         const output = document.createElement("canvas");
-        output.width = Math.round(window.innerWidth * ratio);
-        output.height = Math.round(window.innerHeight * ratio);
+        output.width = Math.round(window.innerWidth * pixelRatio);
+        output.height = Math.round(window.innerHeight * pixelRatio);
 
         const ctx = output.getContext("2d");
-        ctx.scale(ratio, ratio);
+        ctx.scale(pixelRatio, pixelRatio);
 
-        drawVideoCover(ctx, video, window.innerWidth, window.innerHeight);
-        ctx.drawImage(arCanvas, 0, 0, window.innerWidth, window.innerHeight);
+        drawCover(
+          ctx,
+          video,
+          video.videoWidth,
+          video.videoHeight,
+          window.innerWidth,
+          window.innerHeight
+        );
+
+        ctx.drawImage(
+          rendererCanvas,
+          0,
+          0,
+          rendererCanvas.width,
+          rendererCanvas.height,
+          0,
+          0,
+          window.innerWidth,
+          window.innerHeight
+        );
 
         const blob = await new Promise((resolve, reject) => {
           output.toBlob(
