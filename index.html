@@ -17,7 +17,7 @@
       height: 100%;
       margin: 0;
       overflow: hidden;
-      background: #000;
+      background: transparent;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
@@ -46,9 +46,10 @@
       z-index: 1100;
       width: 68px;
       height: 68px;
+      padding: 0;
       border: 5px solid rgba(255, 255, 255, 0.95);
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.35);
+      background: rgba(255, 255, 255, 0.28);
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
@@ -60,10 +61,6 @@
       inset: 7px;
       border-radius: 50%;
       background: #fff;
-    }
-
-    #capture-button:active {
-      transform: translateX(-50%) scale(0.94);
     }
 
     #flash {
@@ -118,19 +115,9 @@
       <img id="welcome-character" src="./images/welcome.png">
     </a-assets>
 
-    <a-camera
-      position="0 0 0"
-      look-controls="enabled: false"
-    ></a-camera>
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <a-entity
-      id="reception-target"
-      mindar-image-target="targetIndex: 0"
-    >
-      <!--
-        新しいマーカー位置用
-        大きさを約1.6倍にし、足元が受付台に合いやすいよう上へ補正
-      -->
+    <a-entity id="reception-target" mindar-image-target="targetIndex: 0">
       <a-image
         id="welcome-image"
         src="#welcome-character"
@@ -182,23 +169,20 @@
       }, 2400);
     }
 
-    function drawVideoCover(ctx, video, canvasWidth, canvasHeight) {
-      const videoWidth = video.videoWidth;
-      const videoHeight = video.videoHeight;
-
-      if (!videoWidth || !videoHeight) {
-        throw new Error("カメラ映像を取得できません");
+    function drawVideoCover(ctx, video, width, height) {
+      if (!video.videoWidth || !video.videoHeight) {
+        throw new Error("camera-not-ready");
       }
 
       const scale = Math.max(
-        canvasWidth / videoWidth,
-        canvasHeight / videoHeight
+        width / video.videoWidth,
+        height / video.videoHeight
       );
 
-      const drawWidth = videoWidth * scale;
-      const drawHeight = videoHeight * scale;
-      const offsetX = (canvasWidth - drawWidth) / 2;
-      const offsetY = (canvasHeight - drawHeight) / 2;
+      const drawWidth = video.videoWidth * scale;
+      const drawHeight = video.videoHeight * scale;
+      const offsetX = (width - drawWidth) / 2;
+      const offsetY = (height - drawHeight) / 2;
 
       ctx.drawImage(video, offsetX, offsetY, drawWidth, drawHeight);
     }
@@ -220,23 +204,20 @@
           flash.style.opacity = "0";
         });
 
-        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
         const output = document.createElement("canvas");
-        output.width = Math.round(window.innerWidth * pixelRatio);
-        output.height = Math.round(window.innerHeight * pixelRatio);
+        output.width = Math.round(window.innerWidth * ratio);
+        output.height = Math.round(window.innerHeight * ratio);
 
         const ctx = output.getContext("2d");
-        ctx.save();
-        ctx.scale(pixelRatio, pixelRatio);
+        ctx.scale(ratio, ratio);
 
         drawVideoCover(ctx, video, window.innerWidth, window.innerHeight);
         ctx.drawImage(arCanvas, 0, 0, window.innerWidth, window.innerHeight);
 
-        ctx.restore();
-
         const blob = await new Promise((resolve, reject) => {
           output.toBlob(
-            (result) => result ? resolve(result) : reject(new Error("画像作成失敗")),
+            (result) => result ? resolve(result) : reject(new Error("blob-error")),
             "image/jpeg",
             0.94
           );
@@ -264,16 +245,12 @@
         document.body.appendChild(link);
         link.click();
         link.remove();
-
         setTimeout(() => URL.revokeObjectURL(url), 3000);
+
         showMessage("写真を保存しました");
       } catch (error) {
+        if (error && error.name === "AbortError") return;
         console.error(error);
-
-        if (error && error.name === "AbortError") {
-          return;
-        }
-
         showMessage("撮影できませんでした。もう一度お試しください");
       }
     }
