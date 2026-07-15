@@ -17,29 +17,87 @@
       height: 100%;
       margin: 0;
       overflow: hidden;
+      background: #000;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
     #guide {
       position: fixed;
       left: 50%;
-      bottom: 24px;
+      bottom: 108px;
       transform: translateX(-50%);
       z-index: 1000;
+      max-width: 84vw;
       padding: 10px 16px;
-      border-radius: 20px;
-      background: rgba(0, 0, 0, 0.65);
-      color: white;
-      font-family: sans-serif;
-      font-size: 16px;
+      border-radius: 22px;
+      background: rgba(0, 0, 0, 0.62);
+      color: #fff;
+      font-size: 15px;
       text-align: center;
       white-space: nowrap;
       pointer-events: none;
+    }
+
+    #capture-button {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      z-index: 1100;
+      width: 68px;
+      height: 68px;
+      border: 5px solid rgba(255, 255, 255, 0.95);
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.35);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #capture-button::after {
+      content: "";
+      position: absolute;
+      inset: 7px;
+      border-radius: 50%;
+      background: #fff;
+    }
+
+    #capture-button:active {
+      transform: translateX(-50%) scale(0.94);
+    }
+
+    #flash {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #message {
+      position: fixed;
+      left: 50%;
+      top: 20px;
+      transform: translateX(-50%);
+      z-index: 1200;
+      display: none;
+      max-width: 86vw;
+      padding: 10px 16px;
+      border-radius: 20px;
+      background: rgba(0, 0, 0, 0.72);
+      color: #fff;
+      font-size: 14px;
+      text-align: center;
     }
   </style>
 </head>
 
 <body>
   <div id="guide">受付のマークにカメラを向けてください</div>
+  <button id="capture-button" type="button" aria-label="写真を撮る"></button>
+  <div id="flash"></div>
+  <div id="message"></div>
 
   <a-scene
     id="ar-scene"
@@ -52,7 +110,7 @@
       missTolerance: 10;
     "
     color-space="sRGB"
-    renderer="colorManagement: true; physicallyCorrectLights: true"
+    renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true"
     vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false"
   >
@@ -69,11 +127,16 @@
       id="reception-target"
       mindar-image-target="targetIndex: 0"
     >
+      <!--
+        新しいマーカー位置用
+        大きさを約1.6倍にし、足元が受付台に合いやすいよう上へ補正
+      -->
       <a-image
+        id="welcome-image"
         src="#welcome-character"
-        position="-1.35 0.10 0.02"
-        width="1.35"
-        height="1.35"
+        position="-1.55 0.55 0.02"
+        width="2.20"
+        height="2.20"
         material="shader: flat; transparent: true; alphaTest: 0.05; side: double"
       ></a-image>
     </a-entity>
@@ -83,6 +146,9 @@
     const scene = document.querySelector("#ar-scene");
     const target = document.querySelector("#reception-target");
     const guide = document.querySelector("#guide");
+    const captureButton = document.querySelector("#capture-button");
+    const flash = document.querySelector("#flash");
+    const message = document.querySelector("#message");
 
     scene.addEventListener("arReady", () => {
       guide.textContent = "受付のマークを探してください";
@@ -107,6 +173,112 @@
     window.addEventListener("orientationchange", () => {
       setTimeout(() => window.dispatchEvent(new Event("resize")), 300);
     });
+
+    function showMessage(text) {
+      message.textContent = text;
+      message.style.display = "block";
+      setTimeout(() => {
+        message.style.display = "none";
+      }, 2400);
+    }
+
+    function drawVideoCover(ctx, video, canvasWidth, canvasHeight) {
+      const videoWidth = video.videoWidth;
+      const videoHeight = video.videoHeight;
+
+      if (!videoWidth || !videoHeight) {
+        throw new Error("カメラ映像を取得できません");
+      }
+
+      const scale = Math.max(
+        canvasWidth / videoWidth,
+        canvasHeight / videoHeight
+      );
+
+      const drawWidth = videoWidth * scale;
+      const drawHeight = videoHeight * scale;
+      const offsetX = (canvasWidth - drawWidth) / 2;
+      const offsetY = (canvasHeight - drawHeight) / 2;
+
+      ctx.drawImage(video, offsetX, offsetY, drawWidth, drawHeight);
+    }
+
+    async function capturePhoto() {
+      try {
+        const video = document.querySelector("video");
+        const arCanvas = scene.canvas;
+
+        if (!video || !arCanvas) {
+          showMessage("カメラの準備ができていません");
+          return;
+        }
+
+        flash.style.transition = "none";
+        flash.style.opacity = "0.85";
+        requestAnimationFrame(() => {
+          flash.style.transition = "opacity 180ms ease";
+          flash.style.opacity = "0";
+        });
+
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+        const output = document.createElement("canvas");
+        output.width = Math.round(window.innerWidth * pixelRatio);
+        output.height = Math.round(window.innerHeight * pixelRatio);
+
+        const ctx = output.getContext("2d");
+        ctx.save();
+        ctx.scale(pixelRatio, pixelRatio);
+
+        drawVideoCover(ctx, video, window.innerWidth, window.innerHeight);
+        ctx.drawImage(arCanvas, 0, 0, window.innerWidth, window.innerHeight);
+
+        ctx.restore();
+
+        const blob = await new Promise((resolve, reject) => {
+          output.toBlob(
+            (result) => result ? resolve(result) : reject(new Error("画像作成失敗")),
+            "image/jpeg",
+            0.94
+          );
+        });
+
+        const fileName = `aqlub-ar-${Date.now()}.jpg`;
+        const file = new File([blob], fileName, { type: "image/jpeg" });
+
+        if (
+          navigator.share &&
+          navigator.canShare &&
+          navigator.canShare({ files: [file] })
+        ) {
+          await navigator.share({
+            files: [file],
+            title: "アクラブAR写真"
+          });
+          return;
+        }
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(() => URL.revokeObjectURL(url), 3000);
+        showMessage("写真を保存しました");
+      } catch (error) {
+        console.error(error);
+
+        if (error && error.name === "AbortError") {
+          return;
+        }
+
+        showMessage("撮影できませんでした。もう一度お試しください");
+      }
+    }
+
+    captureButton.addEventListener("click", capturePhoto);
   </script>
 </body>
 </html>
