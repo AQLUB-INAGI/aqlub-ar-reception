@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+  >
+  <title>アクラブAR</title>
+
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #guide {
+      position: fixed;
+      left: 50%;
+      bottom: 108px;
+      transform: translateX(-50%);
+      z-index: 1000;
+      max-width: 84vw;
+      padding: 10px 16px;
+      border-radius: 22px;
+      background: rgba(0, 0, 0, 0.62);
+      color: #fff;
+      font-size: 15px;
+      text-align: center;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    #capture-button {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      z-index: 1100;
+      width: 68px;
+      height: 68px;
+      padding: 0;
+      border: 5px solid rgba(255, 255, 255, 0.95);
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.28);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #capture-button::after {
+      content: "";
+      position: absolute;
+      inset: 7px;
+      border-radius: 50%;
+      background: #fff;
+    }
+
+    #flash {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #message {
+      position: fixed;
+      left: 50%;
+      top: 20px;
+      transform: translateX(-50%);
+      z-index: 1200;
+      display: none;
+      max-width: 86vw;
+      padding: 10px 16px;
+      border-radius: 20px;
+      background: rgba(0, 0, 0, 0.72);
+      color: #fff;
+      font-size: 14px;
+      text-align: center;
+    }
+
+
+    /* 顔出し用：マーカー位置ではなく画面中央に固定表示 */
+    #face-overlay {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1050;
+      display: none;
+      width: min(92vw, 720px);
+      max-height: 80vh;
+      object-fit: contain;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    /* 顔出し画像を閉じるボタン */
+    #face-close-button {
+      position: fixed;
+      top: max(16px, env(safe-area-inset-top));
+      right: 16px;
+      z-index: 1150;
+      display: none;
+      width: 48px;
+      height: 48px;
+      padding: 0;
+      border: 2px solid rgba(255, 255, 255, 0.95);
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.68);
+      color: #fff;
+      font-size: 30px;
+      line-height: 42px;
+      text-align: center;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="guide">マークにカメラを向けてください</div>
+  <button id="capture-button" type="button" aria-label="写真を撮る"></button>
+  <div id="flash"></div>
+  <div id="message"></div>
+  <!-- 顔出し用画像。images/face.pngを優先し、なければimage/face.pngを読み込みます -->
+  <img
+    id="face-overlay"
+    src="./images/face.png"
+    alt=""
+    onerror="this.onerror=null; this.src='./image/face.png';"
+  >
+  <button
+    id="face-close-button"
+    type="button"
+    aria-label="顔出し画像を閉じる"
+  >×</button>
+
+
+  <a-scene
+    id="ar-scene"
+    mindar-image="
+      imageTargetSrc: ./targets.mind;
+      autoStart: true;
+      filterMinCF: 0.001;
+      filterBeta: 0.01;
+      warmupTolerance: 5;
+      missTolerance: 10;
+      maxTrack: 1;
+    "
+    color-space="sRGB"
+    renderer="
+      colorManagement: true;
+      physicallyCorrectLights: true;
+      alpha: true;
+      antialias: true;
+      preserveDrawingBuffer: true;
+    "
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false"
+  >
+    <a-assets>
+      <img id="welcome-character" src="./images/welcome.png">
+      <img id="shark-character" src="./images/shark.png">
+      <img id="gokiburi-character" src="./images/gokiburi.png">
+    </a-assets>
+
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    <!-- targetIndex 0：受付 -->
+    <a-entity
+      id="reception-target"
+      class="ar-target"
+      mindar-image-target="targetIndex: 0"
+    >
+      <a-image
+        id="welcome-image"
+        src="#welcome-character"
+        position="0 0.25 0.02"
+        width="2.55"
+        height="2.55"
+        material="shader: flat; transparent: true; alphaTest: 0.05; side: double"
+      ></a-image>
+    </a-entity>
+
+    <!-- targetIndex 1：シャーク -->
+    <!-- マーカーの下に表示し、床に足が付くようにした初期値 -->
+    <a-entity
+      id="shark-target"
+      class="ar-target"
+      mindar-image-target="targetIndex: 1"
+    >
+      <a-image
+        id="shark-image"
+        src="#shark-character"
+        position="0 -1.95 0.02"
+        width="2.30"
+        height="2.30"
+        material="shader: flat; transparent: true; alphaTest: 0.05; side: double"
+      ></a-image>
+    </a-entity>
+
+    <!-- targetIndex 2：ゴキブリ -->
+    <!-- マーカーの上に表示し、飛んでいるようにした初期値 -->
+    <a-entity
+      id="gokiburi-target"
+      class="ar-target"
+      mindar-image-target="targetIndex: 2"
+    >
+      <a-image
+        id="gokiburi-image"
+        src="#gokiburi-character"
+        position="0 1.65 0.02"
+        width="2.35"
+        height="2.35"
+        material="shader: flat; transparent: true; alphaTest: 0.05; side: double"
+      ></a-image>
+    </a-entity>
+
+
+    <!-- targetIndex 3：顔出し用 -->
+    <!-- 位置固定の画像はHTML側で表示するため、このターゲット自体にはAR画像を置きません -->
+    <a-entity
+      id="face-target"
+      mindar-image-target="targetIndex: 3"
+    ></a-entity>
+  </a-scene>
+
+  <script>
+    const scene = document.querySelector("#ar-scene");
+    const targets = document.querySelectorAll(".ar-target");
+    const guide = document.querySelector("#guide");
+    const captureButton = document.querySelector("#capture-button");
+    const flash = document.querySelector("#flash");
+    const message = document.querySelector("#message");
+    const faceTarget = document.querySelector("#face-target");
+    const faceOverlay = document.querySelector("#face-overlay");
+    const faceCloseButton = document.querySelector("#face-close-button");
+    let faceModeActive = false;
+
+    scene.addEventListener("arReady", () => {
+      guide.textContent = "マークを探してください";
+      setTimeout(() => window.dispatchEvent(new Event("resize")), 300);
+      setTimeout(() => window.dispatchEvent(new Event("resize")), 1000);
+    });
+
+    scene.addEventListener("arError", () => {
+      guide.textContent =
+        "カメラを開始できません。ブラウザのカメラ許可を確認してください";
+    });
+
+    targets.forEach((target) => {
+      target.addEventListener("targetFound", () => {
+        faceModeActive = false;
+        faceOverlay.style.display = "none";
+        faceCloseButton.style.display = "none";
+        guide.style.display = "none";
+      });
+
+      target.addEventListener("targetLost", () => {
+        guide.style.display = "block";
+        guide.textContent = "もう一度、マークを映してください";
+      });
+    });
+
+    /*
+      顔出し用マーカーを一度認識したら、マーカーが画面外へ移動しても
+      face.pngをカメラ画面中央に固定して表示し続けます。
+      受付・シャーク・ゴキブリの別マーカーを認識すると解除されます。
+    */
+    faceTarget.addEventListener("targetFound", () => {
+      faceModeActive = true;
+      faceOverlay.style.display = "block";
+      faceCloseButton.style.display = "block";
+      guide.style.display = "none";
+    });
+
+    faceTarget.addEventListener("targetLost", () => {
+      if (faceModeActive) {
+        faceOverlay.style.display = "block";
+        faceCloseButton.style.display = "block";
+        guide.style.display = "none";
+      }
+    });
+
+    faceCloseButton.addEventListener("click", () => {
+      faceModeActive = false;
+      faceOverlay.style.display = "none";
+      faceCloseButton.style.display = "none";
+      guide.style.display = "block";
+      guide.textContent = "マークを探してください";
+    });
+
+    window.addEventListener("orientationchange", () => {
+      setTimeout(() => window.dispatchEvent(new Event("resize")), 300);
+    });
+
+    function showMessage(text) {
+      message.textContent = text;
+      message.style.display = "block";
+      setTimeout(() => {
+        message.style.display = "none";
+      }, 2400);
+    }
+
+    function drawCover(ctx, source, sourceWidth, sourceHeight, destWidth, destHeight) {
+      const scale = Math.max(destWidth / sourceWidth, destHeight / sourceHeight);
+      const width = sourceWidth * scale;
+      const height = sourceHeight * scale;
+      const x = (destWidth - width) / 2;
+      const y = (destHeight - height) / 2;
+      ctx.drawImage(source, x, y, width, height);
+    }
+
+    async function capturePhoto() {
+      try {
+        const video = document.querySelector("video");
+        const rendererCanvas =
+          scene.renderer && scene.renderer.domElement
+            ? scene.renderer.domElement
+            : scene.canvas;
+
+        if (
+          !video ||
+          !rendererCanvas ||
+          !video.videoWidth ||
+          !video.videoHeight
+        ) {
+          showMessage("カメラの準備ができていません");
+          return;
+        }
+
+        if (scene.renderer && scene.object3D && scene.camera) {
+          scene.renderer.render(scene.object3D, scene.camera);
+        }
+
+        flash.style.transition = "none";
+        flash.style.opacity = "0.85";
+        requestAnimationFrame(() => {
+          flash.style.transition = "opacity 180ms ease";
+          flash.style.opacity = "0";
+        });
+
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+        const output = document.createElement("canvas");
+        output.width = Math.round(window.innerWidth * pixelRatio);
+        output.height = Math.round(window.innerHeight * pixelRatio);
+
+        const ctx = output.getContext("2d");
+        ctx.scale(pixelRatio, pixelRatio);
+
+        drawCover(
+          ctx,
+          video,
+          video.videoWidth,
+          video.videoHeight,
+          window.innerWidth,
+          window.innerHeight
+        );
+
+        ctx.drawImage(
+          rendererCanvas,
+          0,
+          0,
+          rendererCanvas.width,
+          rendererCanvas.height,
+          0,
+          0,
+          window.innerWidth,
+          window.innerHeight
+        );
+
+        /* 顔出し用の画面固定PNGも保存画像へ合成 */
+        if (
+          faceModeActive &&
+          faceOverlay.style.display !== "none" &&
+          faceOverlay.complete &&
+          faceOverlay.naturalWidth > 0
+        ) {
+          const rect = faceOverlay.getBoundingClientRect();
+          ctx.drawImage(
+            faceOverlay,
+            rect.left,
+            rect.top,
+            rect.width,
+            rect.height
+          );
+        }
+
+        const blob = await new Promise((resolve, reject) => {
+          output.toBlob(
+            (result) => result ? resolve(result) : reject(new Error("blob-error")),
+            "image/jpeg",
+            0.94
+          );
+        });
+
+        const fileName = `aqlub-ar-${Date.now()}.jpg`;
+        const file = new File([blob], fileName, { type: "image/jpeg" });
+
+        if (
+          navigator.share &&
+          navigator.canShare &&
+          navigator.canShare({ files: [file] })
+        ) {
+          await navigator.share({
+            files: [file],
+            title: "アクラブAR写真"
+          });
+          return;
+        }
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 3000);
+
+        showMessage("写真を保存しました");
+      } catch (error) {
+        if (error && error.name === "AbortError") return;
+        console.error(error);
+        showMessage("撮影できませんでした。もう一度お試しください");
+      }
+    }
+
+    captureButton.addEventListener("click", capturePhoto);
+  </script>
+</body>
+</html>
